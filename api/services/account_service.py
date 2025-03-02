@@ -205,7 +205,9 @@ class AccountService:
         is_setup: Optional[bool] = False,
     ) -> Account:
         """create account"""
-        if not FeatureService.get_system_features().is_allow_register and not is_setup:
+        if (not FeatureService.get_system_features().is_allow_register and
+            not FeatureService.get_system_features().is_allow_oauth_register and
+            not is_setup):
             from controllers.console.error import AccountNotFound
 
             raise AccountNotFound()

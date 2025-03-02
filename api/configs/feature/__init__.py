@@ -541,6 +541,26 @@ class AuthConfig(BaseSettings):
         default=None,
     )
 
+    OIDC_ISSUER: Optional[str] = Field(
+        description="OIDC issuer",
+        default=None,
+    )
+
+    OIDC_SCOPES: Optional[str] = Field(
+        description="OIDC scopes",
+        default="openid email profile",
+    )
+
+    OIDC_CLIENT_ID: Optional[str] = Field(
+        description="OIDC client ID",
+        default=None,
+    )
+
+    OIDC_CLIENT_SECRET: Optional[str] = Field(
+        description="OIDC client secret",
+        default=None,
+    )
+
     ACCESS_TOKEN_EXPIRE_MINUTES: PositiveInt = Field(
         description="Expiration time for access tokens in minutes",
         default=60,
@@ -830,6 +850,10 @@ class LoginConfig(BaseSettings):
     )
     ALLOW_REGISTER: bool = Field(
         description="whether to enable register",
+        default=False,
+    )
+    ALLOW_OAUTH_REGISTER: bool = Field(
+        description="whether to enable oauth register",
         default=False,
     )
     ALLOW_CREATE_WORKSPACE: bool = Field(

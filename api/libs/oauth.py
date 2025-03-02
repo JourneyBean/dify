@@ -4,6 +4,8 @@ from typing import Optional
 
 import requests
 
+from configs import dify_config
+
 
 @dataclass
 class OAuthUserInfo:
@@ -131,3 +133,63 @@ class GoogleOAuth(OAuth):
 
     def _transform_user_info(self, raw_info: dict) -> OAuthUserInfo:
         return OAuthUserInfo(id=str(raw_info["sub"]), name="", email=raw_info["email"])
+
+
+class OIDCOAuth(OAuth):
+
+    def __init__(self, client_id, client_secret, redirect_uri):
+        super().__init__(client_id, client_secret, redirect_uri)
+        issuer = dify_config.OIDC_ISSUER
+        self.issuer = issuer if issuer[-1] != "/" else issuer[:-1]
+        self.scopes = dify_config.OIDC_SCOPES.strip()
+
+        discovery_response = requests.get(f"{self.issuer}/.well-known/openid-configuration")
+        discovery_response.raise_for_status()
+        discovery_config = discovery_response.json()
+
+        self.authorization_endpoint = discovery_config["authorization_endpoint"]
+        self.token_endpoint = discovery_config["token_endpoint"]
+        self.userinfo_endpoint = discovery_config["userinfo_endpoint"]
+
+    def get_authorization_url(self, invite_token: Optional[str] = None):
+        params = {
+            "response_type": "code",
+            "client_id": self.client_id,
+            "redirect_uri": self.redirect_uri,
+            "scope": self.scopes,
+        }
+        if invite_token:
+            params["state"] = invite_token
+        return f"{self.authorization_endpoint}?{urllib.parse.urlencode(params)}"
+
+    def get_access_token(self, code: str):
+        data = {
+            "grant_type": "authorization_code",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "code": code,
+            "redirect_uri": self.redirect_uri,
+        }
+        headers = {"Accept": "application/json"}
+        response = requests.post(self.token_endpoint, data=data, headers=headers)
+        response.raise_for_status()
+        response_json = response.json()
+        access_token = response_json.get("access_token")
+
+        if not access_token:
+            raise ValueError(f"Error in OIDC OAuth: {response_json}")
+
+        return access_token
+    
+    def get_raw_user_info(self, token: str):
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(self.userinfo_endpoint, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+    def _transform_user_info(self, raw_info: dict) -> OAuthUserInfo:
+        return OAuthUserInfo(
+            id=raw_info["sub"],
+            name=raw_info["preferred_username"],
+            email=raw_info["email"],
+        )

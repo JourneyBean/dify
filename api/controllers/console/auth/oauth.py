@@ -14,7 +14,7 @@ from constants.languages import languages
 from events.tenant_event import tenant_was_created
 from extensions.ext_database import db
 from libs.helper import extract_remote_ip
-from libs.oauth import GitHubOAuth, GoogleOAuth, OAuthUserInfo
+from libs.oauth import GitHubOAuth, GoogleOAuth, OAuthUserInfo, OIDCOAuth
 from models import Account
 from models.account import AccountStatus
 from services.account_service import AccountService, RegisterService, TenantService
@@ -43,8 +43,17 @@ def get_oauth_providers():
                 client_secret=dify_config.GOOGLE_CLIENT_SECRET,
                 redirect_uri=dify_config.CONSOLE_API_URL + "/console/api/oauth/authorize/google",
             )
+        print(dify_config.OIDC_CLIENT_ID)
+        if not dify_config.OIDC_ISSUER or not dify_config.OIDC_CLIENT_ID:
+            oidc_oauth = None
+        else:
+            oidc_oauth = OIDCOAuth(
+                client_id=dify_config.OIDC_CLIENT_ID,
+                client_secret=dify_config.OIDC_CLIENT_SECRET,
+                redirect_uri=dify_config.CONSOLE_API_URL + "/console/api/oauth/authorize/oidc",
+            )
 
-        OAUTH_PROVIDERS = {"github": github_oauth, "google": google_oauth}
+        OAUTH_PROVIDERS = {"github": github_oauth, "google": google_oauth, "oidc": oidc_oauth}
         return OAUTH_PROVIDERS
 
 
@@ -159,7 +168,7 @@ def _generate_account(provider: str, user_info: OAuthUserInfo):
                 tenant_was_created.send(tenant)
 
     if not account:
-        if not FeatureService.get_system_features().is_allow_register:
+        if not FeatureService.get_system_features().is_allow_oauth_register:
             raise AccountNotFoundError()
         account_name = user_info.name or "Dify"
         account = RegisterService.register(
